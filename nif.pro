@@ -3,7 +3,7 @@
 # Project created by QtCreator 2018-07-19T13:54:22
 #
 #-------------------------------------------------
-
+#Project git
 QT       += core gui sql network xml svg
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
