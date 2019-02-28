@@ -1,0 +1,70 @@
+********************** supplier report **********************
+
+// opening balance
+select transaction_master.previous_balance,transaction_master.previous_balance_type from transaction_master where transaction_master.day_no='2' and rowid=(select min(rowid ) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097'
+
+// closing balance
+select transaction_master.balance,transaction_master.balance_type from transaction_master where transaction_master.day_no='2' and rowid=(select max(rowid ) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097'
+
+// no of loads
+select count(transaction_master.vehicle_no) from transaction_master where transaction_master.day_no='2' and transaction_master.vehicle_no='TN41AC7417' and transaction_master.cus_name='Chandran' and transaction_master.is_payment='0'
+
+// husk paid_amount
+select sum(transaction_master.inward_hush),sum(transaction_master.paid) from transaction_master where transaction_master.vehicle_no='TN41AC7417' and transaction_master.cus_name='Chandran' and transaction_master.day_no='1'
+
+
+********************** batch details supplier wise **********************
+
+select transaction_master.vehicle_no,transaction_master.cus_name,count(transaction_master.cus_name),sum(transaction_master.inward_bale),sum(transaction_master.inward_hush) from transaction_master where transaction_master.balance_type='1' and transaction_master.batch_no='1' and transaction_master.is_payment='0' group by transaction_master.cus_name
+-- total
+select sum(transaction_master.inward_bale),sum(transaction_master.inward_hush) from transaction_master where transaction_master.balance_type='1' and transaction_master.batch_no='1'
+
+
+// receipts and payment
+
+select day_master.open_date,day_master.opening_cash,day_master.closing_cash from day_master where day_master.day_no='1'
+
+select sum(cash_from_transaction.cash_recv) from cash_from_transaction where cash_from_transaction.day_no='2' and cash_from_transaction.user_name=(select user_master.user_name from user_master where user_master.user_type='1'limit 1)
+
+
+
+********************** employee report **********************
+
+-- opening bal
+select employee_transaction.opening_balance,employee_transaction.opening_balance_type from employee_transaction where rowid=(select min(rowid) from employee_transaction where employee_transaction.emp_name='siva' and employee_transaction.day_no='1')
+
+--closing balance
+select employee_transaction.pending_salary,employee_transaction.emp_balance_type from employee_transaction where rowid=(select max(rowid) from employee_transaction where employee_transaction.emp_name='siva' and employee_transaction.day_no='1')
+
+--paid/calc salary/hrs
+select sum(employee_transaction.produced_bale),sum(employee_transaction.working_hrs),sum(employee_transaction.working_hrs_salary),sum(employee_transaction.paid_salary) from employee_transaction where employee_transaction.emp_name='siva' and employee_transaction.day_no='2'
+
+
+ ********************** expense report **********************
+
+select expense_transaction.user_id,expense_transaction.bill_no,sum(expense_transaction.amount) as total_expense from expense_transaction where expense_transaction.day_no='1' and expense_transaction.user_id=(select user_master.user_name from user_master where user_master.user_type='1' limit 1) and expense_transaction.expense_name='Grocery'
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+select transaction_master.day_no,day_master.open_date,transaction_master.cus_name,transaction_master.vehicle_no,sum(transaction_master.inward_hush) as husk,sum(transaction_master.approved_amt) as approved_amt,sum(transaction_master.paid) as paid,(select transaction_master.previous_balance from transaction_master where rowid=(select min(rowid) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') as op_bal,(select transaction_master.previous_balance_type from transaction_master where rowid=(select min(rowid) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') as op_bal_type,(select transaction_master.balance from transaction_master where rowid=(select max(rowid ) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') as cl_bal,(select transaction_master.balance_type from transaction_master where rowid=(select max(rowid ) from transaction_master where transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') and transaction_master.vehicle_no='KA06D6097' and transaction_master.cus_name='KA06D6097') as cl_bal_type from transaction_master inner join day_master on transaction_master.day_no=day_master.day_no where transaction_master.cus_name='KA06D6097' and transaction_master.rowid>(select max(rowid) from transaction_master where transaction_master.balance=0 and transaction_master.cus_name='KA06D6097')

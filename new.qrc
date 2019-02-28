@@ -1,0 +1,20 @@
+<RCC>
+    <qresource prefix="/">
+        <file>icons/batch.jpg</file>
+        <file>icons/bunk.png</file>
+        <file>icons/coconut.png</file>
+        <file>icons/day_close.png</file>
+        <file>icons/day_open.png</file>
+        <file>icons/input.jpg</file>
+        <file>icons/master_config.png</file>
+        <file>icons/payment.png</file>
+        <file>icons/rate_settings.jpg</file>
+        <file>icons/report_edit.jpeg</file>
+        <file>icons/system_settings.jpg</file>
+        <file>icons/data_transfer.png</file>
+        <file>icons/cash_in.jpeg</file>
+        <file>icons/Refresh.png</file>
+        <file>icons/system_settings.png</file>
+        <file>icons/void_bill.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,1378 @@
+#if(SDK75)
+    QSqlQuery day_details;
+    if(databaseObj->selectQuery("SELECT day_no,status,open_date,open_time,close_date,close_time,open_bull_reading,open_gen_reading,open_eb_reading,open_diesel_reading,opening_bale_balance FROM day_master WHERE id_day= (SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')",day_details))
+    {
+        //#if(SDK75)
+        if(day_details.next())
+        {
+            CPrinter print;
+            print.setFontType(CPrinter::eFontType_font2);
+
+            print.addData("Day Close Report",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("Day No    :"+day_details.value(0).toString(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("Open Date :"+day_details.value(2).toString(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("Open Time :"+day_details.value(3).toString(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("Close Date:"+day_details.value(4).toString(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("Close Time:"+day_details.value(5).toString(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            day_details.clear();
+            QStringList lst_aval_batch_type;
+            QString total_husk;
+            QString rate_of_husk;
+
+            if(databaseObj->selectQuery("select transaction_master.batch_type from transaction_master where transaction_master.day_no=(SELECT day_no FROM day_master WHERE id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) and transaction_master.is_payment=0 group by transaction_master.batch_type",day_details))
+            {
+                if(day_details.next())
+                {
+                    lst_aval_batch_type << day_details.value(0).toString().trimmed();
+                    while(day_details.next())
+                    {
+                        lst_aval_batch_type << day_details.value(0).toString().trimmed();
+                    }
+                    qDebug()<<"avaliable batched ===>>>"<<lst_aval_batch_type;
+                }
+            }
+            float t_husk = 0;
+            if(lst_aval_batch_type.size() > 0)
+            {
+                print.addData("Purchase Report Details",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                print.addData("TYPE  LOADS  T.CFT  T.HUSK    RUN KMS ",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+                int t_loads=0;
+                float t_cft =0;
+                int t_kms = 0;
+
+                for(int i=0;i<lst_aval_batch_type.size();i++)
+                {
+                    day_details.clear();
+
+                    if(lst_aval_batch_type.at(i).toInt() == 0)
+                        rate_of_husk = "rate_of_husk";
+
+                    if(lst_aval_batch_type.at(i).toInt() == 1)
+                        rate_of_husk = "auto_rate_of_husk";
+
+                    if(lst_aval_batch_type.at(i).toInt() == 2)
+                        rate_of_husk = "van_rate_of_husk";
+
+                    qDebug()<<"lst_aval_batch_type ===>>>"<<lst_aval_batch_type.at(i);
+
+                    if(databaseObj->selectQuery("select batch_type,count(transaction_master.batch_type) as no_of_loads,sum(transaction_master.inward_bale) as total_cft,sum(transaction_master.inward_hush) as total_husk,sum(transaction_master.excess_amt) as excess,sum(transaction_master.approved_amt) as approved_amt,round(sum(transaction_master.inward_hush)/sum(transaction_master.approved_amt),2) as rate_per_husk,sum(transaction_master.vkms) as vkms from transaction_master where transaction_master.batch_type='"+lst_aval_batch_type.at(i)+"'  and day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",day_details))
+                    {
+                        if(day_details.next())
+                        {
+                            QString batch_name,to_print;
+                            if(lst_aval_batch_type.at(i).toInt() == 0)
+                                batch_name = "Comp";
+                            if(lst_aval_batch_type.at(i).toInt() == 1)
+                                batch_name = "Auto";
+                            if(lst_aval_batch_type.at(i).toInt() == 2)
+                                batch_name = "Van";
+
+                            to_print = batch_name.leftJustified(4,' ',1)+"  "+day_details.value(1).toString().trimmed().rightJustified(6,' ')+"  "+day_details.value(2).toString().trimmed().rightJustified(6,' ',1)+"  "+day_details.value(3).toString().trimmed().rightJustified(7,' ',1)+"  "+day_details.value(7).toString().trimmed().rightJustified(7,' ',1);
+
+                            t_loads += day_details.value(1).toInt();
+                            t_cft += day_details.value(2).toFloat();
+                            t_husk += day_details.value(3).toInt();
+                            t_kms += day_details.value(7).toInt();
+                            qDebug()<<"to_print ===>>>"<<to_print;
+
+                            print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                        }
+                    }
+                }
+                QString total_print;
+                total_print = "Total "+QString::number(t_loads).rightJustified(6,' ')+"  "+QString::number(t_cft,'f',2).rightJustified(6,' ',1)+"  "+QString::number(t_husk).rightJustified(7,' ',1)+"  "+QString::number(t_kms).rightJustified(7,' ',1);
+                print.addData(total_print,CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            }
+
+
+            //! PURCHASE VALUE DETAILS
+
+            print.addData("Purchase Value Details",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("TYPE QUANTITY HUSKRATE  AMOUNT  EXCESS",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            float pv_rate_of_husk = 0;
+            float pv_amt = 0;
+            int pv_excess =0;
+            int count = 0;
+
+
+            for(int i=0;i<lst_aval_batch_type.size();i++)
+            {
+                day_details.clear();
+
+                if(lst_aval_batch_type.at(i).toInt() == 0)
+                    rate_of_husk = "rate_of_husk";
+
+                if(lst_aval_batch_type.at(i).toInt() == 1)
+                    rate_of_husk = "auto_rate_of_husk";
+
+                if(lst_aval_batch_type.at(i).toInt() == 2)
+                    rate_of_husk = "van_rate_of_husk";
+
+                if(databaseObj->selectQuery("select batch_type,count(transaction_master.batch_type) as no_of_loads,sum(transaction_master.inward_bale) as total_cft,sum(transaction_master.inward_hush) as total_husk,sum(transaction_master.excess_amt) as excess,sum(transaction_master.approved_amt) as approved_amt,round(sum(transaction_master.approved_amt)/sum(transaction_master.inward_hush),2) as rate_per_husk,sum(transaction_master.vkms) as vkms from transaction_master where transaction_master.batch_type='"+lst_aval_batch_type.at(i)+"' and day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",day_details))
+                {
+                    if(day_details.next())
+                    {
+                        QString batch_name,to_print;
+                        if(lst_aval_batch_type.at(i).toInt() == 0)
+                            batch_name = "Comp";
+                        if(lst_aval_batch_type.at(i).toInt() == 1)
+                            batch_name = "Auto";
+                        if(lst_aval_batch_type.at(i).toInt() == 2)
+                            batch_name = "Van";
+
+                        to_print = batch_name.leftJustified(5,' ',1)+" "+day_details.value(3).toString().trimmed().rightJustified(8,' ')+" "+day_details.value(6).toString().trimmed().rightJustified(8,' ',1)+" "+day_details.value(5).toString().trimmed().rightJustified(7,' ',1)+" "+day_details.value(4).toString().trimmed().rightJustified(6,' ',1);
+                        count += 1;
+                        pv_rate_of_husk += day_details.value(6).toFloat();
+                        pv_amt += day_details.value(5).toInt();
+                        pv_excess += day_details.value(4).toInt();
+
+
+                        qDebug()<<"to_print ===>>>"<<to_print;
+
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+            QString pv_total_print;
+
+            qDebug()<<"pv_total_print ===>>>"<<QString::number(pv_amt/t_husk);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            pv_total_print = QString("Avg & Total :").leftJustified(14,' ',1)+" "+QString::number(pv_amt/t_husk,'f',2).rightJustified(8,' ')+" "+QString::number(pv_amt).rightJustified(6,' ',1)+" "+QString::number(pv_excess).rightJustified(6,' ',1);
+            print.addData(pv_total_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+
+
+            //! CASH FLOW DETAILS
+            print.addData("Cash Flow Details",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+
+
+            int husk_pay = 0;
+            for(int i=0;i<lst_aval_batch_type.size();i++)
+            {
+                day_details.clear();
+
+                if(lst_aval_batch_type.at(i).toInt() == 0)
+                    rate_of_husk = "rate_of_husk";
+
+                if(lst_aval_batch_type.at(i).toInt() == 1)
+                    rate_of_husk = "auto_rate_of_husk";
+
+                if(lst_aval_batch_type.at(i).toInt() == 2)
+                    rate_of_husk = "van_rate_of_husk";
+
+                if(databaseObj->selectQuery("select batch_type,count(transaction_master.batch_type) as no_of_loads,sum(transaction_master.paid) as paid from transaction_master where transaction_master.batch_type='"+lst_aval_batch_type.at(i)+"'",day_details))
+                {
+
+                    if(day_details.next())
+                    {
+                        QString batch_name,to_print;
+                        if(lst_aval_batch_type.at(i).toInt() == 0)
+                            batch_name = "Comp";
+                        if(lst_aval_batch_type.at(i).toInt() == 1)
+                            batch_name = "Auto";
+                        if(lst_aval_batch_type.at(i).toInt() == 2)
+                            batch_name = "Van";
+
+                        husk_pay += day_details.value(2).toInt();
+                    }
+                }
+            }
+
+            QSqlQuery cash_balance;
+            if(databaseObj->selectQuery("select day_master.opening_cash,day_master.closing_cash from day_master where id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')",cash_balance))
+            {
+                if(cash_balance.next())
+                {
+                    print.addData("Opening Cash Balance:Rs "+cash_balance.value(0).toString().trimmed().rightJustified(8,' ',1),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_RIGHT);
+                }
+            }
+
+            QSqlQuery cash_receipt;
+            if(databaseObj->selectQuery("select sum(cash_from_transaction.cash_recv) from cash_from_transaction where cash_from_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",cash_receipt))
+            {
+                if(cash_receipt.next())
+                {
+                    print.addData("COMPANY CASH RCPT:Rs "+cash_receipt.value(0).toString().trimmed().rightJustified(8,' ',1),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_RIGHT);
+                }
+            }
+
+            //                cash_balance.clear();
+            //                if(databaseObj->selectQuery("select cash_from_transaction.user_name,user_master.name,cash_from_transaction.date_time,cash_from_transaction.cash_recv from cash_from_transaction inner join user_master on user_master.user_name=cash_from_transaction.user_name where cash_from_transaction.cash_from='Company' and day_no=(select day_master.day_no from day_master where day_master.id_day=id_day=(SELECT MAX(id_day) FROM day_master where status='1' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",cash_balance))
+            //                {
+            //                    int tot_cash_received = 0;
+            //                    if(cash_balance.next())
+            //                    {
+            //                        print.addData("Company Cash Receipt",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_RIGHT);
+            //                        print.addData(cash_balance.value(2).toString().right(20,' ',1)+" "+cash_balance.value(1).toString().trimmed().leftJustified(10,' ',1)+" "+cash_balance.value(3).toString().trimmed().rightJustified(7,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            //                        tot_cash_received += cash_balance.value(3).toInt();
+            //                        while(cash_balance.next())
+            //                        {
+            //                            print.addData(cash_balance.value(2).toString().right(20,' ',1)+" "+cash_balance.value(1).toString().trimmed().leftJustified(10,' ',1)+" "+cash_balance.value(3).toString().trimmed().rightJustified(7,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            //                            tot_cash_received += cash_balance.value(3).toInt();
+            //                        }
+            //                        print.addData("Total Cash Received: Rs "+QString::number(tot_cash_received),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_RIGHT);
+            //                    }
+            //                }
+            //                if(husk_pay > 0)
+            //                {
+            //                    print.addData("Husk Payment: Rs"+QString::number(husk_pay),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            //                }
+
+            QSqlQuery payables_qur;
+            QString v_pay = "0";
+            float total_exp_amt = 0;
+            QStringList lst_v_no,lst_party_name,lst_amt;
+            payables_qur.clear();
+            if(databaseObj->selectQuery("select vehicle_no,cus_name,paid from transaction_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) and paid > 0",payables_qur))
+            {
+                if(payables_qur.next())
+                {
+                    lst_v_no << payables_qur.value(0).toString().trimmed();
+                    lst_party_name << payables_qur.value(1).toString().trimmed();
+                    lst_amt << payables_qur.value(2).toString().trimmed();
+                    while(payables_qur.next())
+                    {
+                        lst_v_no << payables_qur.value(0).toString().trimmed();
+                        lst_party_name << payables_qur.value(1).toString().trimmed();
+                        lst_amt << payables_qur.value(2).toString().trimmed();
+                    }
+                }
+                if(lst_v_no.size() > 0)
+                {
+                    print.addData("Husk Payment",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                    print.addData("Vehicle No    Party Name       Amount",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+                    for(int i=0;i<lst_v_no.size();i++)
+                    {
+                        print.addData(lst_v_no.at(i).leftJustified(11,' ',1)+" "+lst_party_name.at(i).remove(" ").leftJustified(15,' ',1)+" "+QString::number(lst_amt.at(i).toFloat(),'f',2).rightJustified(10,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    }
+                    payables_qur.clear();
+                    if(databaseObj->selectQuery("select sum(paid) from transaction_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",payables_qur))
+                    {
+                        if(payables_qur.next())
+                        {
+                            v_pay = payables_qur.value(0).toString().trimmed();
+                        }
+                    }
+                }
+            }
+
+
+            QSqlQuery bunk_qur;
+            QString bunk_pay = "0";
+            QStringList lst_bunk_name,lst_bunk_qty,lst_bunk_amount;
+            if(databaseObj->selectQuery("select diesel_transaction.bunk_id,bunk_master.bunk_name,diesel_transaction.quantity,diesel_transaction.amount from diesel_transaction inner join bunk_master on diesel_transaction.bunk_id=bunk_master.id_bunk_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and is_payment='1' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",bunk_qur))
+            {
+                if(bunk_qur.next())
+                {
+                    lst_bunk_name << bunk_qur.value(1).toString().trimmed();
+                    lst_bunk_qty << bunk_qur.value(2).toString().trimmed();
+                    lst_bunk_amount << bunk_qur.value(3).toString().trimmed();
+                    while(bunk_qur.next())
+                    {
+                        lst_bunk_name << bunk_qur.value(1).toString().trimmed();
+                        lst_bunk_qty << bunk_qur.value(2).toString().trimmed();
+                        lst_bunk_amount << bunk_qur.value(3).toString().trimmed();
+                    }
+                }
+
+                if(lst_bunk_name.size() > 0)
+                {
+                    print.addData("Bunk Payment",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                    for(int i=0;i<lst_bunk_name.size();i++)
+                    {
+                        print.addData("            "+lst_bunk_name.at(i).leftJustified(15,' ')+" "+QString::number(lst_bunk_amount.at(i).rightJustified(10,' ').toFloat(),'f',2),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    }
+                    bunk_qur.clear();
+                    if(databaseObj->selectQuery("select sum(diesel_transaction.amount) from diesel_transaction where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) and is_payment='1'",bunk_qur))
+                    {
+                        if(bunk_qur.next())
+                        {
+                            bunk_pay = bunk_qur.value(0).toString().trimmed();
+                        }
+                    }
+                }
+            }
+
+            QSqlQuery emp_qur;
+            QString emp_pay = "0";
+            QStringList lst_emp_name,lst_emp_amount;
+            if(databaseObj->selectQuery("select emp_name,paid_salary from employee_transaction where paid_salary IS NOT NULL and day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",emp_qur))
+            {
+                if(emp_qur.next())
+                {
+                    lst_emp_name << emp_qur.value(0).toString().trimmed();
+                    lst_emp_amount << emp_qur.value(1).toString().trimmed();
+                    while(emp_qur.next())
+                    {
+                        lst_emp_name << emp_qur.value(0).toString().trimmed();
+                        lst_emp_amount << emp_qur.value(1).toString().trimmed();
+                    }
+                }
+                if(lst_emp_name.size() > 0)
+                {
+                    print.addData("Labour Payment",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                    for(int i=0;i<lst_emp_name.size();i++)
+                    {
+                        print.addData("            "+lst_emp_name.at(i).leftJustified(15,' ')+" "+QString::number(lst_emp_amount.at(i).rightJustified(10,' ').toFloat(),'f',2),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    }
+                    emp_qur.clear();
+                    if(databaseObj->selectQuery("select sum(paid_salary) from employee_transaction where paid_salary IS NOT NULL and day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",emp_qur))
+                    {
+                        if(emp_qur.next())
+                        {
+                            emp_pay = emp_qur.value(0).toString().trimmed();
+                        }
+                    }
+                }
+            }
+
+            QSqlQuery expense_qur;
+            QStringList lst_expense_name,lst_expense_bill_no,lst_expense_amount,lst_expense_user_id;
+            if(databaseObj->selectQuery("select * from expense_transaction where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",expense_qur))
+            {
+                if(expense_qur.next())
+                {
+                    lst_expense_name << expense_qur.value(2).toString().trimmed();
+                    lst_expense_bill_no << expense_qur.value(3).toString().trimmed();
+                    lst_expense_amount << expense_qur.value(4).toString().trimmed();
+                    lst_expense_user_id << expense_qur.value(6).toString().trimmed();
+                    while(expense_qur.next())
+                    {
+                        lst_expense_name << expense_qur.value(2).toString().trimmed();
+                        lst_expense_bill_no << expense_qur.value(3).toString().trimmed();
+                        lst_expense_amount << expense_qur.value(4).toString().trimmed();
+                        lst_expense_user_id << expense_qur.value(6).toString().trimmed();
+                    }
+                }
+            }
+
+            if(lst_expense_name.size() > 0)
+            {
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                print.addData("Expense",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                print.addData("   Expense Name          Amount",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+
+                for(int i=0;i<lst_expense_name.size();i++)
+                {
+                    QString prt_text = QString::number(i+1).rightJustified(2,' ')+" "+lst_expense_name.at(i).leftJustified(15,' ')+" "+QString::number(lst_expense_amount.at(i).toFloat(),'f',2).rightJustified(15,' ');
+                    qDebug()<<"expense data ===>>>"<<prt_text;
+                    print.addData(prt_text,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    total_exp_amt += lst_expense_amount.at(i).toFloat();
+                }
+                //                    print.addData("Total Expense: "+QString::number(total_exp_amt,'f',2),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            }
+            if( (lst_v_no.size() != 0) || (lst_bunk_name.size() != 0) || (lst_emp_name.size() != 0) || total_exp_amt > 0)
+            {
+                print.addData("Total :Rs "+QString::number(v_pay.toFloat() + emp_pay.toFloat() + bunk_pay.toFloat() + total_exp_amt,'f',2 ),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            }
+
+
+            QSqlQuery closing_cash_balance;
+            if(databaseObj->selectQuery("select day_master.opening_cash,day_master.closing_cash from day_master where id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')",closing_cash_balance))
+            {
+                if(closing_cash_balance.next())
+                {
+                    print.addData("Closing Cash Balance:Rs "+closing_cash_balance.value(1).toString().trimmed().rightJustified(8,' ',1),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_RIGHT);
+                }
+            }
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+            print.addData("Stock Status Report",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            //! today
+
+            QSqlQuery stock_qur;
+            QStringList lst_stock_batch;
+            lst_stock_batch << "company_batch_no" << "other_batch_no" << "van_batch_no";
+            print.addData(" TYPE   BATCHNO  CFT  NO.OF.HUSK",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            int husk_only = 0;
+            float cft_only = 0;
+
+            int husk_pro = 0;
+            float cft_pro = 0;
+
+            for(int i=0;i<lst_stock_batch.size();i++)
+            {
+                QStringList lst_stock_batch_no,lst_stock_batch_cft,lst_stock_batch_husk;
+                QString stock_purchase,stock_production;
+                QString pro_batch_name;
+                if(databaseObj->selectQuery("select batch_no,total_husk_produced,inward_stock from "+lst_stock_batch.at(i)+" where production_status='2'",stock_qur))
+                {
+
+                    if(stock_qur.next())
+                    {
+                        lst_stock_batch_no << stock_qur.value(0).toString().trimmed();
+                        lst_stock_batch_husk << stock_qur.value(1).toString().trimmed();
+                        lst_stock_batch_cft << stock_qur.value(2).toString().trimmed();
+                        while(stock_qur.next())
+                        {
+                            lst_stock_batch_no << stock_qur.value(0).toString().trimmed();
+                            lst_stock_batch_husk << stock_qur.value(1).toString().trimmed();
+                            lst_stock_batch_cft << stock_qur.value(2).toString().trimmed();
+                        }
+
+                        if(lst_stock_batch.at(i).contains("company_batch_no"))
+                            pro_batch_name = "Comp Husk";
+                        if(lst_stock_batch.at(i).contains("other_batch_no"))
+                            pro_batch_name = "Auto Husk";
+                        if(lst_stock_batch.at(i).contains("van_batch_no"))
+                            pro_batch_name = "Van Husk ";
+
+                        for(int p=0;p<lst_stock_batch_no.size();p++)
+                            print.addData(pro_batch_name.leftJustified(9,' ',1)+" "+lst_stock_batch_no.at(p).rightJustified(4,'0').rightJustified(7,' ',1)+" "+lst_stock_batch_cft.at(p).rightJustified(7,' ',1)+" "+lst_stock_batch_husk.at(p).rightJustified(10,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+
+
+
+                    }
+
+                }
+                QString pro_batch_name1;
+                if(lst_stock_batch.at(i).contains("company_batch_no"))
+                    pro_batch_name1 = "company";
+                if(lst_stock_batch.at(i).contains("other_batch_no"))
+                    pro_batch_name1 = "auto";
+                if(lst_stock_batch.at(i).contains("van_batch_no"))
+                    pro_batch_name1 = "van";
+                stock_qur.clear();
+                if(databaseObj->selectQuery("select batch_no,husk_available,batch_type from production_batch_order where batch_type='"+pro_batch_name1+"'",stock_qur))
+                {
+                    if(stock_qur.next())
+                    {
+
+                        QString pro_batch_name2;
+                        if(stock_qur.value(2).toString().contains("company"))
+                            pro_batch_name2 = "Company";
+                        if(stock_qur.value(2).toString().contains("auto"))
+                            pro_batch_name2 = "Auto";
+                        if(stock_qur.value(2).toString().contains("van"))
+                            pro_batch_name2 = "Van";
+
+                        int tmp_husk = stock_qur.value(1).toInt();
+                        husk_pro += tmp_husk;
+                        cft_pro += (tmp_husk/Home_ScreenObj->HP_cft.toFloat());
+                        print.addData(pro_batch_name2.leftJustified(9,' ',1)+" "+stock_qur.value(0).toString().trimmed().rightJustified(4,'0').rightJustified(7,' ',1)+" "+QString::number(stock_qur.value(1).toInt()/Home_ScreenObj->HP_cft.toInt()).rightJustified(7,' ',1)+" "+stock_qur.value(1).toString().rightJustified(10,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                        while(stock_qur.next())
+                        {
+
+                            QString pro_batch_name2;
+                            if(stock_qur.value(2).toString().contains("company"))
+                                pro_batch_name2 = "Company";
+                            if(stock_qur.value(2).toString().contains("auto"))
+                                pro_batch_name2 = "Auto";
+                            if(stock_qur.value(2).toString().contains("van"))
+                                pro_batch_name2 = "Van";
+
+                            int tmp_husk = stock_qur.value(1).toInt();
+                            husk_pro += tmp_husk;
+                            cft_pro += (tmp_husk/Home_ScreenObj->HP_cft.toFloat());
+                            print.addData(pro_batch_name2.leftJustified(9,' ',1)+" "+stock_qur.value(0).toString().trimmed().rightJustified(4,'0').rightJustified(7,' ',1)+" "+QString::number(stock_qur.value(1).toInt()/Home_ScreenObj->HP_cft.toInt()).rightJustified(7,' ',1)+" "+stock_qur.value(1).toString().rightJustified(10,' ',1),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                        }
+                        qDebug()<<"cft_pro ===>>>"<<QString::number(cft_pro);
+                    }
+                }
+
+                stock_qur.clear();
+
+                if(databaseObj->selectQuery("select sum(total_husk_produced),sum(inward_stock) from "+lst_stock_batch.at(i)+" where production_status='2'",stock_qur))
+                {
+                    if(stock_qur.next())
+                    {
+                        husk_only += stock_qur.value(0).toString().trimmed().toInt();
+                        cft_only += stock_qur.value(1).toString().trimmed().toFloat();
+                        qDebug()<<"cft_only ===>>>"<<QString::number(cft_only);
+                    }
+                }
+            }
+
+            QString tot_cft_husk = QString("Total").leftJustified(13,' ',1)+" "+QString::number(cft_only+cft_pro).trimmed().rightJustified(8,' ',1)+" "+QString::number(husk_only+husk_pro).trimmed().rightJustified(9,' ',1);
+            qDebug()<<"tot_cft_husk ===>>>"<<tot_cft_husk;
+            print.addData(tot_cft_husk,CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+            stock_qur.clear();
+            QString closing_bale,closing_husk;
+            int closing_husk1 = 0;
+            if(databaseObj->selectQuery("select closing_bale_balance from day_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",stock_qur))
+            {
+                if(stock_qur.next())
+                {
+                    closing_bale = stock_qur.value(0).toString().trimmed();
+                    closing_husk = QString::number(closing_bale.toFloat()*Home_ScreenObj->HP_bale.toFloat(),'f',2);
+                    closing_husk1 = (closing_bale.toInt()*Home_ScreenObj->HP_bale.toInt());
+                    qDebug()<<"closing_husk1 ===>>>"<<QString::number(closing_husk1);
+                }
+            }
+            //                float total_husk_count = husk_available_production.toFloat()+closing_husk.toFloat();
+            print.addData(QString("Bale").leftJustified(13,' ',1)+" "+closing_bale.trimmed().append(" Nos").rightJustified(8,' ',1)+" "+closing_husk.trimmed().rightJustified(9,' ',1),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("Total Husk In Stock "+QString::number(husk_only+husk_pro+closing_husk1).trimmed().rightJustified(9,' ',1),CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            QSqlQuery diesel_report_qur;
+            print.addData("Diesel Consumption",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            if(databaseObj->selectQuery("select open_diesel_reading,close_diesel_reading from day_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",diesel_report_qur ))
+            {
+                if(diesel_report_qur.next())
+                {
+                    print.addData("OPENING STOCK  : "+diesel_report_qur.value(0).toString().trimmed()+" Lts",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                }
+            }
+
+            diesel_report_qur.clear();
+            if(databaseObj->selectQuery("select sum(diesel_transaction.quantity) from diesel_transaction where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",diesel_report_qur ))
+            {
+                if(diesel_report_qur.next())
+                {
+                    print.addData("TODAY PURCHASE : "+diesel_report_qur.value(0).toString().trimmed()+" Lts",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                }
+            }
+
+            diesel_report_qur.clear();
+            if(databaseObj->selectQuery("select sum(diesel_usage.quantity) from diesel_usage where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",diesel_report_qur ))
+            {
+                if(diesel_report_qur.next())
+                {
+                    print.addData("CONSUMPTION    : "+diesel_report_qur.value(0).toString().trimmed()+" Lts",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                }
+            }
+
+            diesel_report_qur.clear();
+            if(databaseObj->selectQuery("select diesel_usage.vehicle_no,sum(diesel_usage.quantity),diesel_usage.fill_type from diesel_usage where diesel_usage.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by diesel_usage.vehicle_no",diesel_report_qur))
+            {
+                if(diesel_report_qur.next())
+                {
+                    //! new
+                    QString vehicle_no;
+                    QString vehicle_consumption;
+                    vehicle_no = diesel_report_qur.value(0).toString().trimmed();
+                    vehicle_consumption = diesel_report_qur.value(1).toString().trimmed();
+
+                    QString diesel_to_print;
+                    QString millage;
+                    millage = get_difference(vehicle_no);
+
+                    QString unit;
+                    if(vehicle_no.contains("bull",Qt::CaseInsensitive) || vehicle_no.contains("generator",Qt::CaseInsensitive))
+                    {
+                        unit = "Lts/Hr";
+                    }
+                    else
+                    {
+                        unit = "Lts/km";
+                    }
+
+                    if(!millage.isEmpty())
+                        print.addData(vehicle_no.toUpper().leftJustified(12,' ',1)+":"+vehicle_consumption.append("lts")+" Milage:"+millage,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    else
+                        print.addData(vehicle_no.toUpper().leftJustified(12,' ',1)+":"+vehicle_consumption.append("lts"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+                    while(diesel_report_qur.next())
+                    {
+                        //! new
+                        QString vehicle_no;
+                        QString vehicle_consumption;
+                        vehicle_no = diesel_report_qur.value(0).toString().trimmed();
+                        vehicle_consumption = diesel_report_qur.value(1).toString().trimmed();
+
+                        QString diesel_to_print;
+                        QString millage;
+                        millage = get_difference(vehicle_no);
+
+                        QString unit;
+                        if(vehicle_no.contains("bull",Qt::CaseInsensitive) || vehicle_no.contains("generator",Qt::CaseInsensitive))
+                        {
+                            unit = "Lts/Hr";
+                        }
+                        else
+                        {
+                            unit = "Lts/km";
+                        }
+
+                        if(!millage.isEmpty())
+                            print.addData(vehicle_no.toUpper().leftJustified(12,' ',1)+":"+vehicle_consumption.append("lts")+" Milage:"+millage,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                        else
+                            print.addData(vehicle_no.toUpper().leftJustified(12,' ',1)+":"+vehicle_consumption.append("lts"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+                    }
+                }
+            }
+
+            diesel_report_qur.clear();
+
+            if(databaseObj->selectQuery("select open_diesel_reading,close_diesel_reading from day_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",diesel_report_qur ))
+            {
+                if(diesel_report_qur.next())
+                {
+                    print.addData("CLOSING STOCK  : "+diesel_report_qur.value(1).toString().trimmed()+" Lts",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                }
+            }
+            //! METER READING
+
+            QSqlQuery reading_qur;
+            if(databaseObj->selectQuery("select sum(day_master.close_bull_reading)-sum(day_master.open_bull_reading) as bull, sum(day_master.close_gen_reading)-sum(day_master.open_gen_reading) as gen, sum(day_master.close_eb_reading)-sum(day_master.open_eb_reading) as eb from day_master where day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",reading_qur))
+            {
+                if(reading_qur.next())
+                {
+                    print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    print.addData("Meter Reading",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                    print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                    print.addData("Bull Meter     :"+reading_qur.value(0).toString().trimmed()+" Hrs",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    print.addData("Generator Meter:"+reading_qur.value(1).toString().trimmed()+" Hrs",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                    print.addData("EB Meter       :"+reading_qur.value(2).toString().trimmed()+" Units",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                }
+            }
+
+
+
+            //! LEDGER WISE REPORT
+
+
+            float total_op_bal = 0;
+            float total_cl_bal = 0;
+            float total_paid = 0;
+            float total_addition = 0;
+
+
+
+            print.addData("Ledger Wise Report",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+            print.addData("  LEDGER   OP.BAL TODAY+  PAID  CL.BAL",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+            //! supplier
+            print.addData("Supplier Ledger",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            QSqlQuery supplier_ledger;
+            if(databaseObj->selectQuery("select transaction_master.vehicle_no,transaction_master.cus_name,min(transaction_master.previous_balance) as op_bal,min(transaction_master.previous_balance_type) as op_bal_type,sum(transaction_master.inward_hush) as inward_husk,sum(transaction_master.approved_amt) as approved_amt,sum(transaction_master.paid) as paid,customer_master.balance,customer_master.balance_type from transaction_master inner join customer_master on customer_master.cus_name=transaction_master.cus_name where transaction_master.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by transaction_master.cus_name",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+                    QString opening_str = "";
+                    QString closing_str = "";
+
+
+                    if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                        opening_str = "+";
+                        total_op_bal += supplier_ledger.value(2).toFloat();
+                    }
+                    if(supplier_ledger.value(3).toInt() == 1){
+                        opening_str = "-";
+                        total_op_bal -= supplier_ledger.value(2).toFloat();
+                    }
+
+
+                    QSqlQuery closing_supplier_balance;
+                    QString particular_supplier_bal;
+                    if(databaseObj->selectQuery("select transaction_master.balance,transaction_master.balance_type from transaction_master where rowid=(select max(rowid) from transaction_master where transaction_master.vehicle_no='"+supplier_ledger.value(0).toString().trimmed()+"' and transaction_master.cus_name='"+supplier_ledger.value(1).toString().trimmed()+"')",closing_supplier_balance))
+                    {
+                        if(closing_supplier_balance.next())
+                        {
+                            particular_supplier_bal = closing_supplier_balance.value(0).toString().trimmed();
+                            if(closing_supplier_balance.value(1).toInt() == 0 || closing_supplier_balance.value(1).toInt() == 2){
+                                closing_str = "+";
+                                total_cl_bal += closing_supplier_balance.value(0).toFloat();
+                            }
+                            if(closing_supplier_balance.value(1).toInt() == 1){
+                                closing_str = "-";
+                                total_cl_bal -= closing_supplier_balance.value(0).toFloat();
+                            }
+                        }
+                    }
+
+                    total_paid += supplier_ledger.value(6).toFloat();
+                    total_addition += supplier_ledger.value(5).toFloat();
+
+                    to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(6).toString().trimmed().rightJustified(6,' ',1)+particular_supplier_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+                        QString opening_str = "";
+                        QString closing_str = "";
+
+
+                        if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                            opening_str = "+";
+                            total_op_bal += supplier_ledger.value(2).toFloat();
+                        }
+                        if(supplier_ledger.value(3).toInt() == 1){
+                            opening_str = "-";
+                            total_op_bal -= supplier_ledger.value(2).toFloat();
+                        }
+                        QSqlQuery closing_supplier_balance;
+                        QString particular_supplier_bal;
+                        if(databaseObj->selectQuery("select transaction_master.balance,transaction_master.balance_type from transaction_master where rowid=(select max(rowid) from transaction_master where transaction_master.vehicle_no='"+supplier_ledger.value(0).toString().trimmed()+"' and transaction_master.cus_name='"+supplier_ledger.value(1).toString().trimmed()+"')",closing_supplier_balance))
+                        {
+                            if(closing_supplier_balance.next())
+                            {
+                                particular_supplier_bal = closing_supplier_balance.value(0).toString().trimmed();
+                                if(closing_supplier_balance.value(1).toInt() == 0 || closing_supplier_balance.value(1).toInt() == 2){
+                                    closing_str = "+";
+                                    total_cl_bal += closing_supplier_balance.value(0).toFloat();
+                                }
+                                if(closing_supplier_balance.value(1).toInt() == 1){
+                                    closing_str = "-";
+                                    total_cl_bal -= closing_supplier_balance.value(0).toFloat();
+                                }
+                            }
+                        }
+
+                        total_paid += supplier_ledger.value(6).toFloat();
+                        total_addition += supplier_ledger.value(5).toFloat();
+
+                        to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(6).toString().trimmed().rightJustified(6,' ',1)+particular_supplier_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+            supplier_ledger.clear();
+            if(databaseObj->selectQuery("select customer_master.cus_name,customer_master.balance as cl_bal,customer_master.balance_type as cl_bal_type from customer_master where customer_master.balance>0 and customer_master.cus_name not in (select transaction_master.cus_name from transaction_master where transaction_master.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by transaction_master.cus_name)",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+
+                    QString closing_str = "";
+                    if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                        closing_str = "+";
+                        total_cl_bal += supplier_ledger.value(1).toFloat();
+                    }
+                    if(supplier_ledger.value(2).toInt() == 1){
+                        closing_str = "-";
+                        total_cl_bal -= supplier_ledger.value(1).toFloat();
+                    }
+
+                    to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+
+                        QString closing_str = "";
+                        if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                            closing_str = "+";
+                            total_cl_bal += supplier_ledger.value(1).toFloat();
+                        }
+                        if(supplier_ledger.value(2).toInt() == 1){
+                            closing_str = "-";
+                            total_cl_bal -= supplier_ledger.value(1).toFloat();
+                        }
+
+                        to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+
+            qDebug()<<"Employee total_op_bal ===>>>"<<total_op_bal;
+            qDebug()<<"Employee total_addition ===>>>"<<total_addition;
+            qDebug()<<"Employee total_paid ===>>>"<<total_paid;
+            qDebug()<<"Employee total_cl_bal ===>>>"<<total_cl_bal;
+
+            //! employee
+
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("Employee Ledger",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            supplier_ledger.clear();
+            if(databaseObj->selectQuery("select employee_transaction.emp_name,sum(employee_transaction.produced_bale) as produced_bale,min(employee_transaction.opening_balance) as op_bal,min(employee_transaction.opening_balance_type) as op_bal_type,sum(employee_transaction.calc_salary) as calc_salary,sum(employee_transaction.paid_salary) as paid,employee_master.emp_balance_bale_rate,employee_master.emp_balance_type from employee_transaction inner join employee_master on employee_master.emp_name=employee_transaction.emp_name where employee_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by employee_transaction.emp_name",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+                    QString opening_str = "";
+                    QString closing_str = "";
+
+                    if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                        opening_str = "+";
+                        total_op_bal += supplier_ledger.value(2).toFloat();
+                    }
+                    if(supplier_ledger.value(3).toInt() == 1){
+                        opening_str = "-";
+                        total_op_bal -= supplier_ledger.value(2).toFloat();
+                    }
+
+                    QSqlQuery closing_employee_balance;
+                    QString particular_employee_bal;
+                    if(databaseObj->selectQuery("select employee_transaction.pending_salary,employee_transaction.emp_balance_type from employee_transaction where rowid=(select max(rowid) from employee_transaction where employee_transaction.emp_name='"+supplier_ledger.value(0).toString().trimmed()+"')",closing_employee_balance))
+                    {
+                        if(closing_employee_balance.next())
+                        {
+                            particular_employee_bal = closing_employee_balance.value(0).toString().trimmed();
+                            if(closing_employee_balance.value(1).toInt() == 0 || closing_employee_balance.value(1).toInt() == 2){
+                                closing_str = "+";
+                                total_cl_bal += closing_employee_balance.value(0).toFloat();
+                            }
+                            if(closing_employee_balance.value(1).toInt() == 1){
+                                closing_str = "-";
+                                total_cl_bal -= closing_employee_balance.value(0).toFloat();
+                            }
+                        }
+                    }
+
+                    total_paid += supplier_ledger.value(5).toFloat();
+                    total_addition += supplier_ledger.value(4).toFloat();
+
+                    to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+particular_employee_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+                        QString opening_str = "";
+                        QString closing_str = "";
+
+                        if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                            opening_str = "+";
+                            total_op_bal += supplier_ledger.value(2).toFloat();
+                        }
+                        if(supplier_ledger.value(3).toInt() == 1){
+                            opening_str = "-";
+                            total_op_bal -= supplier_ledger.value(2).toFloat();
+                        }
+
+
+                        QSqlQuery closing_employee_balance;
+                        QString particular_employee_bal;
+                        if(databaseObj->selectQuery("select employee_transaction.pending_salary,employee_transaction.emp_balance_type from employee_transaction where rowid=(select max(rowid) from employee_transaction where employee_transaction.emp_name='"+supplier_ledger.value(0).toString().trimmed()+"')",closing_employee_balance))
+                        {
+                            if(closing_employee_balance.next())
+                            {
+                                particular_employee_bal = closing_employee_balance.value(0).toString().trimmed();
+                                if(closing_employee_balance.value(1).toInt() == 0 || closing_employee_balance.value(1).toInt() == 2){
+                                    closing_str = "+";
+                                    total_cl_bal += closing_employee_balance.value(0).toFloat();
+                                }
+                                if(closing_employee_balance.value(1).toInt() == 1){
+                                    closing_str = "-";
+                                    total_cl_bal -= closing_employee_balance.value(0).toFloat();
+                                }
+                            }
+                        }
+
+                        total_paid += supplier_ledger.value(5).toFloat();
+                        total_addition += supplier_ledger.value(4).toFloat();
+
+                        to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+particular_employee_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+
+            supplier_ledger.clear();
+            if(databaseObj->selectQuery("select employee_master.emp_name,employee_master.emp_balance_bale_rate,employee_master.emp_balance_type from employee_master where  is_active='1' and employee_master.emp_name not in (select employee_transaction.emp_name from employee_transaction where employee_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by employee_transaction.emp_name)",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+
+                    QString closing_str = "";
+                    if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                        closing_str = "+";
+                        total_cl_bal += supplier_ledger.value(1).toFloat();
+                    }
+                    if(supplier_ledger.value(2).toInt() == 1){
+                        closing_str = "-";
+                        total_cl_bal -= supplier_ledger.value(1).toFloat();
+                    }
+
+                    to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+
+                        QString closing_str = "";
+                        if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                            closing_str = "+";
+                            total_cl_bal += supplier_ledger.value(1).toFloat();
+                        }
+                        if(supplier_ledger.value(2).toInt() == 1){
+                            closing_str = "-";
+                            total_cl_bal -= supplier_ledger.value(1).toFloat();
+                        }
+                        to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+
+            qDebug()<<"Employee total_op_bal ===>>>"<<total_op_bal;
+            qDebug()<<"Employee total_addition ===>>>"<<total_addition;
+            qDebug()<<"Employee total_paid ===>>>"<<total_paid;
+            qDebug()<<"Employee total_cl_bal ===>>>"<<total_cl_bal;
+
+
+
+
+
+
+
+
+
+            //! employee driver staff
+
+                print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                print.addData("Employee Ledger",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+                supplier_ledger.clear();
+                if(databaseObj->selectQuery("select employee_transaction.emp_name,sum(employee_transaction.produced_bale) as produced_bale,min(employee_transaction.opening_balance) as op_bal,min(employee_transaction.opening_balance_type) as op_bal_type,sum(employee_transaction.calc_salary) as calc_salary,sum(employee_transaction.paid_salary) as paid,employee_master.emp_balance,employee_master.emp_balance_type from employee_transaction inner join employee_master on employee_master.emp_name=employee_transaction.emp_name where employee_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by employee_transaction.emp_name",supplier_ledger))
+                {
+                    if(supplier_ledger.next())
+                    {
+                        QString to_print;
+                        QString opening_str = "";
+                        QString closing_str = "";
+
+                        if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                            opening_str = "+";
+                            total_op_bal += supplier_ledger.value(2).toFloat();
+                        }
+                        if(supplier_ledger.value(3).toInt() == 1){
+                            opening_str = "-";
+                            total_op_bal -= supplier_ledger.value(2).toFloat();
+                        }
+
+                        QSqlQuery closing_employee_balance;
+                        QString particular_employee_bal;
+                        if(databaseObj->selectQuery("select employee_transaction.pending_salary,employee_transaction.emp_balance_type from employee_transaction where rowid=(select max(rowid) from employee_transaction where employee_transaction.emp_name='"+supplier_ledger.value(0).toString().trimmed()+"')",closing_employee_balance))
+                        {
+                            if(closing_employee_balance.next())
+                            {
+                                particular_employee_bal = closing_employee_balance.value(0).toString().trimmed();
+                                if(closing_employee_balance.value(1).toInt() == 0 || closing_employee_balance.value(1).toInt() == 2){
+                                    closing_str = "+";
+                                    total_cl_bal += closing_employee_balance.value(0).toFloat();
+                                }
+                                if(closing_employee_balance.value(1).toInt() == 1){
+                                    closing_str = "-";
+                                    total_cl_bal -= closing_employee_balance.value(0).toFloat();
+                                }
+                            }
+                        }
+
+                        total_paid += supplier_ledger.value(5).toFloat();
+                        total_addition += supplier_ledger.value(4).toFloat();
+
+                        to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+particular_employee_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+                        while(supplier_ledger.next())
+                        {
+                            QString to_print;
+                            QString opening_str = "";
+                            QString closing_str = "";
+
+                            if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                                opening_str = "+";
+                                total_op_bal += supplier_ledger.value(2).toFloat();
+                            }
+                            if(supplier_ledger.value(3).toInt() == 1){
+                                opening_str = "-";
+                                total_op_bal -= supplier_ledger.value(2).toFloat();
+                            }
+
+
+                            QSqlQuery closing_employee_balance;
+                            QString particular_employee_bal;
+                            if(databaseObj->selectQuery("select employee_transaction.pending_salary,employee_transaction.emp_balance_type from employee_transaction where rowid=(select max(rowid) from employee_transaction where employee_transaction.emp_name='"+supplier_ledger.value(0).toString().trimmed()+"')",closing_employee_balance))
+                            {
+                                if(closing_employee_balance.next())
+                                {
+                                    particular_employee_bal = closing_employee_balance.value(0).toString().trimmed();
+                                    if(closing_employee_balance.value(1).toInt() == 0 || closing_employee_balance.value(1).toInt() == 2){
+                                        closing_str = "+";
+                                        total_cl_bal += closing_employee_balance.value(0).toFloat();
+                                    }
+                                    if(closing_employee_balance.value(1).toInt() == 1){
+                                        closing_str = "-";
+                                        total_cl_bal -= closing_employee_balance.value(0).toFloat();
+                                    }
+                                }
+                            }
+
+                            total_paid += supplier_ledger.value(5).toFloat();
+                            total_addition += supplier_ledger.value(4).toFloat();
+
+                            to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+" "+supplier_ledger.value(5).toString().trimmed().rightJustified(6,' ',1)+particular_employee_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+
+                            qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                            print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                        }
+                    }
+                }
+
+                supplier_ledger.clear();
+                if(databaseObj->selectQuery("select employee_master.emp_name,employee_master.emp_balance,employee_master.emp_balance_type from employee_master where  is_active='1' and employee_master.emp_name not in (select employee_transaction.emp_name from employee_transaction where employee_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) group by employee_transaction.emp_name)",supplier_ledger))
+                {
+                    if(supplier_ledger.next())
+                    {
+                        QString to_print;
+
+                        QString closing_str = "";
+                        if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                            closing_str = "+";
+                            total_cl_bal += supplier_ledger.value(1).toFloat();
+                        }
+                        if(supplier_ledger.value(2).toInt() == 1){
+                            closing_str = "-";
+                            total_cl_bal -= supplier_ledger.value(1).toFloat();
+                        }
+
+                        to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                        while(supplier_ledger.next())
+                        {
+                            QString to_print;
+
+                            QString closing_str = "";
+                            if(supplier_ledger.value(2).toInt() == 0 || supplier_ledger.value(8).toInt() == 2){
+                                closing_str = "+";
+                                total_cl_bal += supplier_ledger.value(1).toFloat();
+                            }
+                            if(supplier_ledger.value(2).toInt() == 1){
+                                closing_str = "-";
+                                total_cl_bal -= supplier_ledger.value(1).toFloat();
+                            }
+                            to_print = supplier_ledger.value(0).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(1).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                            qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                            print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                        }
+                    }
+                }
+
+                qDebug()<<"Employee driver staff total_op_bal ===>>>"<<total_op_bal;
+                qDebug()<<"Employee driver staff total_addition ===>>>"<<total_addition;
+                qDebug()<<"Employee driver staff total_paid ===>>>"<<total_paid;
+                qDebug()<<"Employee driver staff total_cl_bal ===>>>"<<total_cl_bal;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            //! bunk ledger
+            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+            print.addData("Bunk Ledger",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+
+            supplier_ledger.clear();
+            if(databaseObj->selectQuery("select diesel_transaction.bunk_id,bunk_master.bunk_name,min(diesel_transaction.opening_balance) as op_bal,min(diesel_transaction.opening_balance_type) as op_bal_type,sum(diesel_transaction.amount) as paid,max(diesel_transaction.closing_balance) as cl_bal,max(diesel_transaction.closing_balance_type) as cl_bal_type from diesel_transaction inner join bunk_master on bunk_master.id_bunk_master=diesel_transaction.bunk_id where diesel_transaction.is_payment=1 and diesel_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"'))",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+                    QString opening_str = "";
+                    QString closing_str = "";
+                    if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                        opening_str = "+";
+                        total_op_bal += supplier_ledger.value(2).toFloat();
+                    }
+                    if(supplier_ledger.value(3).toInt() == 1){
+                        opening_str = "-";
+                        total_op_bal -= supplier_ledger.value(2).toFloat();
+                    }
+
+                    QSqlQuery closing_bunk_balance;
+                    QString particular_bunk_bal;
+                    if(databaseObj->selectQuery("select diesel_transaction.closing_balance,diesel_transaction.closing_balance_type from diesel_transaction where rowid=(select max(rowid) from diesel_transaction where diesel_transaction.bunk_id='"+supplier_ledger.value(0).toString().trimmed()+"' and diesel_transaction.is_payment='1') and diesel_transaction.is_payment='1'",closing_bunk_balance))
+                    {
+                        if(closing_bunk_balance.next())
+                        {
+                            particular_bunk_bal = closing_bunk_balance.value(0).toString().trimmed();
+                            if(closing_bunk_balance.value(1).toInt() == 0 || closing_bunk_balance.value(1).toInt() == 2){
+                                closing_str = "+";
+                                total_cl_bal += closing_bunk_balance.value(0).toFloat();
+                            }
+                            if(closing_bunk_balance.value(1).toInt() == 1){
+                                closing_str = "-";
+                                total_cl_bal -= closing_bunk_balance.value(0).toFloat();
+                            }
+                        }
+                    }
+
+
+                    QSqlQuery bunk_today_pur_qur;
+                    QString bunk_todays_addition="";
+                    if(databaseObj->selectQuery("select diesel_transaction.bunk_id,bunk_master.bunk_name,sum(diesel_transaction.amount) as paid from diesel_transaction inner join bunk_master on bunk_master.id_bunk_master=diesel_transaction.bunk_id where diesel_transaction.is_payment=0 and diesel_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) and diesel_transaction.bunk_id='"+supplier_ledger.value(0).toString()+"'",bunk_today_pur_qur))
+                    {
+                        if(bunk_today_pur_qur.next())
+                        {
+                            bunk_todays_addition = bunk_today_pur_qur.value(2).toString();
+                        }
+                    }
+
+
+                    total_paid += supplier_ledger.value(4).toFloat();
+                    total_addition += bunk_todays_addition.toFloat();
+                    to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+bunk_todays_addition.rightJustified(6,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+particular_bunk_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+                        QString opening_str = "";
+                        QString closing_str = "";
+                        if(supplier_ledger.value(3).toInt() == 0 || supplier_ledger.value(3).toInt() == 2){
+                            opening_str = "+";
+                            total_op_bal += supplier_ledger.value(2).toFloat();
+                        }
+                        if(supplier_ledger.value(3).toInt() == 1){
+                            opening_str = "-";
+                            total_op_bal -= supplier_ledger.value(2).toFloat();
+                        }
+
+                        QSqlQuery closing_bunk_balance;
+                        QString particular_bunk_bal;
+                        if(databaseObj->selectQuery("select diesel_transaction.closing_balance,diesel_transaction.closing_balance_type from diesel_transaction where rowid=(select max(rowid) from diesel_transaction where diesel_transaction.bunk_id='"+supplier_ledger.value(0).toString().trimmed()+"' and diesel_transaction.is_payment='1') and diesel_transaction.is_payment='1'",closing_bunk_balance))
+                        {
+                            if(closing_bunk_balance.next())
+                            {
+                                particular_bunk_bal = closing_bunk_balance.value(0).toString().trimmed();
+                                if(closing_bunk_balance.value(1).toInt() == 0 || closing_bunk_balance.value(1).toInt() == 2){
+                                    closing_str = "+";
+                                    total_cl_bal += closing_bunk_balance.value(0).toFloat();
+                                }
+                                if(closing_bunk_balance.value(1).toInt() == 1){
+                                    closing_str = "-";
+                                    total_cl_bal -= closing_bunk_balance.value(0).toFloat();
+                                }
+                            }
+                        }
+
+                        QSqlQuery bunk_today_pur_qur;
+                        QString bunk_todays_addition="";
+                        if(databaseObj->selectQuery("select diesel_transaction.bunk_id,bunk_master.bunk_name,sum(diesel_transaction.amount) as paid from diesel_transaction inner join bunk_master on bunk_master.id_bunk_master=diesel_transaction.bunk_id where diesel_transaction.is_payment=0 and diesel_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) and diesel_transaction.bunk_id='"+supplier_ledger.value(0).toString()+"'",bunk_today_pur_qur))
+                        {
+                            if(bunk_today_pur_qur.next())
+                            {
+                                bunk_todays_addition = bunk_today_pur_qur.value(2).toString();
+                            }
+                        }
+
+                        total_paid += supplier_ledger.value(4).toFloat();
+                        total_addition += bunk_todays_addition.toFloat();
+                        to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(10,' ',1)+supplier_ledger.value(2).toString().trimmed().prepend(opening_str).rightJustified(7,' ',1)+" "+bunk_todays_addition.rightJustified(6,' ',1)+" "+supplier_ledger.value(4).toString().trimmed().rightJustified(6,' ',1)+particular_bunk_bal.trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"supplier_ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+
+            supplier_ledger.clear();
+            if(databaseObj->selectQuery("select * from bunk_master where bunk_master.id_bunk_master not in (select diesel_transaction.bunk_id from diesel_transaction where diesel_transaction.is_payment=1 and diesel_transaction.day_no=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')))",supplier_ledger))
+            {
+                if(supplier_ledger.next())
+                {
+                    QString to_print;
+
+                    QString closing_str = "";
+                    if(supplier_ledger.value(4).toInt() == 0 || supplier_ledger.value(4).toInt() == 2){
+                        closing_str = "+";
+                        total_cl_bal += supplier_ledger.value(3).toFloat();
+                    }
+                    if(supplier_ledger.value(4).toInt() == 1){
+                        closing_str = "-";
+                        total_cl_bal -= supplier_ledger.value(3).toFloat();
+                    }
+
+                    to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(3).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                    qDebug()<<"bunk_master ledger ===>>>"<<to_print;
+                    print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    while(supplier_ledger.next())
+                    {
+                        QString to_print;
+
+                        QString closing_str = "";
+                        if(supplier_ledger.value(4).toInt() == 0 || supplier_ledger.value(4).toInt() == 2){
+                            closing_str = "+";
+                            total_cl_bal += supplier_ledger.value(3).toFloat();
+                        }
+                        if(supplier_ledger.value(4).toInt() == 1){
+                            closing_str = "-";
+                            total_cl_bal -= supplier_ledger.value(3).toFloat();
+                        }
+                        to_print = supplier_ledger.value(1).toString().trimmed().leftJustified(31,' ',1)+supplier_ledger.value(3).toString().trimmed().prepend(closing_str).rightJustified(7,' ',1);
+                        qDebug()<<"bunk_master ledger ===>>>"<<to_print;
+                        print.addData(to_print,CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                    }
+                }
+            }
+
+            QString to_print_total;
+            to_print_total = "Total "+QString::number(total_op_bal).rightJustified(6,' ',1)+" "+QString::number(total_addition).rightJustified(6,' ',1)+QString::number(total_paid).rightJustified(5,' ',1)+QString::number(total_cl_bal).rightJustified(6,' ',1);
+            print.addData(to_print_total,CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+
+            
+            
+            //!Batch Close report
+            QSqlQuery batch_close_qur;
+            QStringList lst_batch;
+            lst_batch << "company_batch_no" << "other_batch_no" << "van_batch_no";
+
+            lst_batch_no.clear();
+            for(int i=0;i<lst_batch.size();i++)
+            {
+
+                QString batch_name;
+                if(lst_batch.at(i).contains("company",Qt::CaseInsensitive))
+                    batch_name = "Company ";
+                if(lst_batch.at(i).contains("other",Qt::CaseInsensitive))
+                    batch_name = "Auto ";
+                if(lst_batch.at(i).contains("van",Qt::CaseInsensitive))
+                    batch_name = "Van ";
+
+
+                if(databaseObj->selectQuery("select batch_no from "+lst_batch.at(i)+" where production_day_no_close=(select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')) order by batch_no desc",batch_close_qur))
+                {
+                    if(batch_close_qur.next())
+                    {
+                        lst_batch_no << batch_name+batch_close_qur.value(0).toString().trimmed().rightJustified(3,'0');
+                        while(batch_close_qur.next())
+                        {
+                            lst_batch_no << batch_name+batch_close_qur.value(0).toString().trimmed().rightJustified(3,'0');
+                        }
+                    }
+                }
+            }
+            qDebug()<<"batch_close_qur ===>>>"<<lst_batch_no;
+            if(lst_batch_no.size() > 0)
+            {
+                for(int i=0;i<lst_batch_no.size();i++)
+                {
+                    QString batch_name;
+                    if(lst_batch_no.at(i).contains("company",Qt::CaseInsensitive))
+                        batch_name = "company_batch_no";
+                    if(lst_batch_no.at(i).contains("auto",Qt::CaseInsensitive))
+                        batch_name = "other_batch_no";
+                    if(lst_batch_no.at(i).contains("van",Qt::CaseInsensitive))
+                        batch_name = "van_batch_no";
+
+
+                    batch_close_qur.clear();
+                    if(databaseObj->selectQuery("select batch_no,total_husk_produced,est_bale,manu_bale,used_husk,excess_husk,diff_bale from "+batch_name+" where production_day_no_close=((select day_master.day_no from day_master where day_master.id_day=(SELECT MAX(id_day) FROM day_master where status='0' and day_no='"+QString::number(ui->lineEdit_day_no->text().trimmed().remove("Day",Qt::CaseInsensitive).toInt())+"')))",batch_close_qur))
+                    {
+                        if(batch_close_qur.next())
+                        {
+
+                            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            print.addData("BATCH CLOSE REPORT",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_CENTER);
+                            print.addData("--------------------------------------",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            print.addData("BATCH NAME        : "+lst_batch_no.at(i).toUpper(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                            print.addData("TOTAL PURCHASE    : "+batch_close_qur.value(1).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            print.addData("TOTAL NO OF BALE  : "+batch_close_qur.value(3).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                            print.addData("NO OF HUSK TO BALE: "+batch_close_qur.value(4).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            QString diff_bale = batch_close_qur.value(6).toString().trimmed().append(" NOS");
+                            QString diff_bale1 = diff_bale;
+
+                            int diff_husk = batch_close_qur.value(4).toInt() - batch_close_qur.value(1).toInt();
+
+                            print.addData("DIFFERENCE        :"+QString::number(diff_husk),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+//                            if(diff_bale1.contains("-"))
+//                                print.addData("DIFFERENCE        :"+diff_bale.remove("-"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+//                            else
+//                                print.addData("DIFFERENCE        :"+diff_bale.prepend("-"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            if(diff_husk > 0)
+                                print.addData("GAIN",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                            else
+                                print.addData("LOSE",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                            while(batch_close_qur.next())
+                            {
+                                print.addData("BATCH NAME        : "+lst_batch_no.at(i).toUpper(),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                                print.addData("TOTAL PURCHASE    : "+batch_close_qur.value(1).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                                print.addData("TOTAL NO OF BALE  : "+batch_close_qur.value(3).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                                print.addData("NO OF HUSK TO BALE:"+batch_close_qur.value(2).toString().trimmed().append(" NOS"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                                QString diff_bale = batch_close_qur.value(6).toString().trimmed().append(" NOS");
+                                QString diff_bale1 = diff_bale;
+
+                                if(diff_bale1.contains("-"))
+                                    print.addData("DIFFERENCE        :"+diff_bale.remove("-"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                                else
+                                    print.addData("DIFFERENCE        :"+diff_bale.prepend("-"),CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+
+                                if(diff_bale1.contains("-"))
+                                    print.addData("GAIN",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                                else
+                                    print.addData("LOSE",CPrinter::eFontSize_MEDIUM,CPrinter::eFontStyle_BOLD,CPrinter::eAlignment_LEFT);
+                            }
+                        }
+                    }
+                }
+            }
+            print.addData("",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            print.addData("",CPrinter::eFontSize_SMALL,CPrinter::eFontStyle_REGULAR,CPrinter::eAlignment_LEFT);
+            if(print.print(false,false))
+            {
+
+            }
+
+        }
+    }
+#endif

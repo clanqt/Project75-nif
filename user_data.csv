@@ -1,0 +1,4 @@
+"id", "name", "user_name", "user_password", "user_mobile", "user_type", "user_designation"
+"1", "Yaswant", "Owner", "1234", "7418682427", "2", "Owner"
+"2", "Kumar", "Manager", "4321", "9750034594", "1", "Manager"
+"3", "Karthick", "User", "9876", "9876543210", "0", "User"
